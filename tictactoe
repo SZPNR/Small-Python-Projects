@@ -1,0 +1,123 @@
+#tic tac toe
+
+board = [
+    ['-','-','-'],
+    ['-','-','-'],
+    ['-','-','-']
+]
+
+def print_board(board):
+    for row in board:
+        for slot in row:
+            print(f"{slot}", end=" ")
+        print()
+
+def quit(user_input):
+    if user_input.lower() == 'q':
+        return True
+    else: return False
+
+def isnum(user_input):
+    if not user_input.isnumeric():
+        return False
+    return True
+
+def isbetween(user_input):
+    if int(user_input) >= 1 and int(user_input) <= 9:
+        return True
+    return False  
+
+def check_number(user_input):
+    if isnum(user_input):
+        if isbetween(user_input):
+            return False
+        print("Pas entre 1 et 9")
+        return True
+    print("Pas un chiffre")
+    return True
+
+def modifboard(user_input,print_board,board,user):
+    user_input = int(user_input)
+    if user_input <= 3:
+        row = 0
+        col = user_input-1
+    elif user_input >= 7:
+        row = 2
+        col = user_input-7
+    else:
+        row = 1
+        col = user_input-4
+    if user:
+        board[row][col] = "x"
+    else: board[row][col] = "o"
+    print_board(board)
+
+def ligne(board):
+    for row in board:
+        if row == ["x","x","x"]:
+            return True
+        elif row == ["o","o","o"]:
+            return True
+
+def colonne(board):
+    for i in range(3):
+        if board[0][i] == "x" and board[1][i] == "x" and board[2][i] == "x":
+            return True
+        if board[0][i] == "o" and board[1][i] == "o" and board[2][i] == "o":
+            return True
+
+def diago(board):
+    if board[0][0] == "x" and board[1][1] == "x" and board[2][2] == "x": return True
+    elif board[0][2] == "o" and board[1][1] == "o" and board[2][0] == "o": return True
+    else: return False
+
+def check_win(board):
+    if ligne(board):
+        return True
+    if colonne(board):
+        return True
+    if diago(board):
+        return True
+    else: return False
+
+print_board(board)
+dejaJoue = set()
+user = False
+tour = 0
+
+while True:
+
+    user_input = input("Entrez un chiffre entre 1 et 9 ou q si vous voulez quitter   ")
+    if quit(user_input):
+        print("Merci d'avoir joué")
+        break
+    if user_input in dejaJoue:
+        print("Déjà joué")
+        print("Ecrivez à nouveau")
+        continue
+    if check_number(user_input):
+        print("Ecrivez à nouveau")
+        continue
+
+    if user_input not in dejaJoue:
+        dejaJoue.add(user_input)
+
+    user = not user
+    if user:
+        print("Au tour des X")
+    else: print("Au tour des O")
+    
+    modifboard(user_input,print_board,board,user)
+
+    if check_win(board):
+        if user:
+            winner = "X"
+        else: winner = "O"
+        print("Winner is " + winner)
+        break
+
+    tour +=1
+    if tour == 9:
+        print_board(board)
+        print("Egalité")
+        break
