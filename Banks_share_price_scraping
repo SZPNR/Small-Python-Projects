@@ -1,0 +1,124 @@
+from bs4 import BeautifulSoup
+import requests
+from time import time, sleep
+import re
+from sklearn import linear_model
+import numpy as np
+import random
+import pandas as pd
+from matplotlib import pyplot as plt
+from statsmodels.tsa.stattools import adfuller
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+from sklearn.linear_model import LinearRegression
+
+duree = int(input("Temps durant lequel l'algorithme récupérera des données, en minutes "))*60
+intervalle = int(input("Intervalle entre chaque scraping, en secondes "))
+nom = str(input("Quelle action voulez vous voir ? \nAXA (AXA) \nBNP Paris (BNP) \nCredit Agricole (CA) \nSociété Générale (SG) \nToutes les sociétés financières côtés sur Euronext (All) \nTapez la valeur entre parenthèse \n"))
+supp = int(input("Nombre d'observations à prédire \n"))
+
+
+#fonction de scraping
+def scraping(nom):
+    if nom == "All":
+        url = "https://www.boursorama.com/bourse/indices/cours/1rPFRFIN/"
+    elif nom == "AXA" or nom == "BNP" or nom == "CA" or nom == "SG":
+        url = "https://www.boursorama.com/bourse/actions/consensus/recommandations-paris/?national_market_filter%5Bmarket%5D=1rPCAC&national_market_filter%5Bsector%5D=8&national_market_filter%5Banalysts%5D=&national_market_filter%5Bperiod%5D=2021&national_market_filter%5Bfilter%5D="
+    else:
+        return "Cette action n'est pas analysée par ce programme"
+    page = requests.get(url)
+    soup = BeautifulSoup(page.text, 'html.parser')
+    if nom == "AXA" or nom == "BNP" or nom == "CA" or nom == "SG":
+        table = soup.find('table', attrs={
+            'class': 'c-table c-table--generic c-table--generic c-shadow-overflow__table-fixed-column'})
+        results = table.find_all('tr')
+        if nom == "AXA":
+            resultstring = (str(results[1])) #on sélectionne la ligne correspondante à l'action AXA
+        elif nom == "BNP":
+            resultstring = (str(results[2]))
+        elif nom == "CA":
+            resultstring = (str(results[3]))
+        elif nom == "SG":
+            resultstring = (str(results[4]))
+    if nom == "All":
+        table = soup.find('div',attrs={"c-faceplate__info"})
+        results = table.find_all('span')
+        resultstring = (str(results[0]))
+    #suppression du texte pour ne garder que les chiffres
+    resultsint = [int(s) for s in
+                  re.findall(r'\b\d+\b',
+                             resultstring)]
+    avant = resultsint[0]  # nombre entier du prix de l'action
+    apres = resultsint[1]  # nombre décimal du prix de l'action
+    # fonction if pour transformer le chiffre apres la virgule en décimale
+    if len(str(apres)) == 3:
+        apres = apres / 1000
+    elif len(str(apres)) == 2:
+        apres = apres / 100
+    elif len(str(apres)) == 1:
+        apres = apres / 10
+    return avant + apres
+
+#création d'une liste vide où seront stockés les données récupérées
+liste_donnees = []
+
+temps = time()+duree #le programme se terminera quand on aura atteint la valeur "temps"
+while time() < temps:
+    sleep(intervalle - time() % intervalle) #temps d'attente entre chaque récupération de données
+    liste_donnees.append(scraping(nom)) #ajout de chaque cours dans la liste liste_donnees
+
+
+#VALEURS GENEREES ALEATOIREMENT POUR VOIR LE BON FONCTIONNEMENT DU MODELE DE PREDICTION
+#mu, sigma = 0, 0.1 # mean and standard deviation
+#s = np.random.normal(25, 4, 20)
+#liste_donnees = s.tolist()
+
+index=[] #liste vide de l'index de chaque cours
+for i in range(len(liste_donnees)): #associer chaque index à une donnée
+    index.append(i+1)
+
+df = pd.DataFrame(liste_donnees, index=index,
+                      columns=['cours'])
+
+plt.plot(df) #plot des données récupérées
+plt.show()
+
+rolling_mean = df.rolling(window = 4).mean() #moyenne mobile
+rolling_std = df.rolling(window = 4).std() #écart type mobile
+plt.plot(df, color = 'blue', label = 'Origine') #création du plot avec la moyenne mobile et l'écart type mobile
+plt.plot(rolling_mean, color = 'red', label = 'Moyenne mobile')
+plt.plot(rolling_std, color = 'black', label = 'Ecart-type mobile')
+plt.legend(loc = 'best')
+plt.title('Moyenne et Ecart-type mobiles')
+plt.show()
+
+result = adfuller(df) #test de Dickey Fuller augmenté pour voir la stationnarité de la série temporelle
+
+print('Statistiques ADF : {}'.format(result[0]))
+print('p-value : {}'.format(result[1]))
+print('Valeurs Critiques :')
+for key, value in result[4].items():
+    print('\t{}: {}'.format(key, value))
+
+X = np.array(index).reshape(-1,1)
+y = np.array(liste_donnees)
+
+regr = LinearRegression()
+regr.fit(X,y) #création de la régression linéaire
+
+index_predict = index.copy()
+pred_avant = len(index_predict)+1 #la liste de cours à prédire commencera là où se termine les observations récupérées par le site
+pred_apres = len(index_predict)+supp
+prediction = list(range(pred_avant, pred_apres))
+index_predict.extend(prediction)
+
+X_new = np.array(index_predict).reshape(-1,1)
+y_new = (regr.predict(X_new))
+
+df1 = pd.DataFrame(liste_donnees, index=index,
+                      columns=['cours'])
+df2 = pd.DataFrame(y_new, index=index_predict,
+                      columns=['cours'])
+plt.plot(df1)
+plt.plot(df2)
+plt.show()
